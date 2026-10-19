@@ -1,5 +1,5 @@
 oc() {
-  local sock="$XDG_RUNTIME_DIR/agent-signing.sock"
+  local sock="$XDG_RUNTIME_DIR/agent-sandbox.sock"
   local rc
 
   # Start ssh-agent if nothing is listening on the socket
@@ -12,7 +12,7 @@ oc() {
 
   # Make sure the signing key is loaded
   SSH_AUTH_SOCK="$sock" ssh-add -l >/dev/null 2>&1 || \
-    SSH_AUTH_SOCK="$sock" ssh-add -c ~/.ssh/agent_signing
+    SSH_AUTH_SOCK="$sock" ssh-add -c ~/.ssh/agent_sandbox
 
   podman run --rm -it \
     --userns=keep-id:uid=1000,gid=1000 \

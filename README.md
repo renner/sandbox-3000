@@ -46,26 +46,24 @@ mkdir -p ~/.config/shell
 install -m 0644 opencode-sandbox.sh ~/.config/shell/opencode-sandbox.sh
 ```
 
-Then load it from your shell startup file.
-
-For interactive bash — the usual choice for terminal windows (`~/.bashrc`):
+Now add this line to your shell's startup file:
 
 ```sh
 [ -f "$HOME/.config/shell/opencode-sandbox.sh" ] && \
   . "$HOME/.config/shell/opencode-sandbox.sh"
 ```
 
-For login shells (`~/.profile`):
+Which file that is depends on how your shells start:
 
-```sh
-[ -f "$HOME/.config/shell/opencode-sandbox.sh" ] && \
-  . "$HOME/.config/shell/opencode-sandbox.sh"
-```
+| Shell | Startup file |
+| --- | --- |
+| Interactive bash (a terminal window) | `~/.bashrc` |
+| Login shells | `~/.profile` (or `~/.bash_profile` if present) |
 
-Pick whichever matches how you start your shells. `.bashrc` is read by
-interactive non-login bash; `.profile` is read by login shells. Many setups have
-`.bash_profile` source `.bashrc`, in which case adding it to `.bashrc` alone is
-enough. Loading it twice is harmless — the function is simply redefined.
+For bash, `~/.bashrc` alone is usually enough: login shells read
+`~/.bash_profile`, `~/.bash_login` or `~/.profile` — whichever exists first —
+and most distributions' default `.profile` sources `~/.bashrc`. Put the line in
+one file only; sourcing it twice works, but just redefines the same function.
 
 The function uses `local`, so source it from bash (or another shell that
 supports `local`) rather than a strict POSIX `sh`.

@@ -1,6 +1,6 @@
-# opencode sandbox
+# Sandbox 3000
 
-A small [podman](https://podman.io) setup for running
+**Sandbox 3000** is a small [podman](https://podman.io) setup for running
 [opencode](https://opencode.ai) in a throwaway container. The directory you
 launch it from is mounted at `/work`, and your host SSH agent is forwarded in,
 so commits can be signed without private keys ever entering the container.
@@ -42,8 +42,8 @@ build under another name, update the script to match.
 running it as a script does nothing.
 
 ```sh
-mkdir -p ~/.config
-install -m 0644 opencode-sandbox.sh ~/.config/opencode-sandbox.sh
+mkdir -p ~/.config/shell
+install -m 0644 opencode-sandbox.sh ~/.config/shell/opencode-sandbox.sh
 ```
 
 Then load it from your shell startup file.
@@ -51,15 +51,15 @@ Then load it from your shell startup file.
 For interactive bash — the usual choice for terminal windows (`~/.bashrc`):
 
 ```sh
-[ -f "$HOME/.config/opencode-sandbox.sh" ] && \
-  . "$HOME/.config/opencode-sandbox.sh"
+[ -f "$HOME/.config/shell/opencode-sandbox.sh" ] && \
+  . "$HOME/.config/shell/opencode-sandbox.sh"
 ```
 
 For login shells (`~/.profile`):
 
 ```sh
-[ -f "$HOME/.config/opencode-sandbox.sh" ] && \
-  . "$HOME/.config/opencode-sandbox.sh"
+[ -f "$HOME/.config/shell/opencode-sandbox.sh" ] && \
+  . "$HOME/.config/shell/opencode-sandbox.sh"
 ```
 
 Pick whichever matches how you start your shells. `.bashrc` is read by

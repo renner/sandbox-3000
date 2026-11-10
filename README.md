@@ -33,8 +33,10 @@ The image is openSUSE Tumbleweed with `git`, `ripgrep`, `curl`, `tar`, `gzip`,
 `openssh-clients` and `opencode` installed. It runs as an unprivileged `agent`
 user (uid 1000) with `/work` as the working directory.
 
-The image name `opencode-sandbox` is hard-coded at the end of `oc()`, so if you
-build under another name, update the script to match.
+`oc` does not build anything: on every launch it pulls
+`ghcr.io/renner/opencode-sandbox:latest` from GHCR, which the GitHub Actions
+workflow publishes on pushes to `main`. If the pull fails, it uses the local copy
+of that image. To run a locally built image instead, tag it with that name.
 
 ## Install the shell integration
 

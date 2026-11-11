@@ -11,6 +11,7 @@ so commits can be signed without private keys ever entering the container.
 | --- | --- |
 | `Containerfile` | Builds the `opencode-sandbox` image |
 | `opencode-sandbox.sh` | Defines the `oc()` shell function that launches it |
+| `install.sh` | Installs, updates or removes the shell integration |
 
 ## Requirements
 
@@ -41,21 +42,40 @@ of that image. To run a locally built image instead, tag it with that name.
 ## Install the shell integration
 
 `opencode-sandbox.sh` only *defines* a function, so it has to be **sourced**;
-running it as a script does nothing.
+running it as a script does nothing. `install.sh` takes care of that:
 
 ```sh
-mkdir -p ~/.config/shell
-install -m 0644 opencode-sandbox.sh ~/.config/shell/opencode-sandbox.sh
+./install.sh
 ```
 
-Now add this line to your shell's startup file:
+It copies `opencode-sandbox.sh` to `~/.config/shell/`, adds a marked block to
+`~/.bashrc` that sources it, reminds you if `~/.ssh/agent_sandbox` is missing,
+and pre-pulls the container image. Open a new shell afterwards.
+
+The script is safe to re-run. Running it again after a `git pull` updates the
+installed function, and the `~/.bashrc` block is never added twice. The image
+itself needs no update step, because `oc` pulls it on every launch.
+
+| Option | Effect |
+| --- | --- |
+| `--no-pull` | Skip pre-pulling the image |
+| `--rc-file FILE` | Hook into `FILE` instead of `~/.bashrc` |
+| `--uninstall` | Remove the installed function and the `~/.bashrc` block |
+
+`--uninstall` leaves the `opencode-home` volume and your SSH key alone.
+
+### Manual install
+
+To do it by hand, copy the file and add this line to your shell's startup file:
 
 ```sh
+install -D -m 0644 opencode-sandbox.sh ~/.config/shell/opencode-sandbox.sh
+
 [ -f "$HOME/.config/shell/opencode-sandbox.sh" ] && \
   . "$HOME/.config/shell/opencode-sandbox.sh"
 ```
 
-Which file that is depends on how your shells start:
+Which startup file that is depends on how your shells start:
 
 | Shell | Startup file |
 | --- | --- |

@@ -106,6 +106,21 @@ opencode:
 oc --help
 ```
 
+### Passing options to podman
+
+`oc` consumes its own `--podman-arg` options and forwards each value to
+`podman run`; all other arguments still go to opencode. Repeat the option once
+per podman argument, for example to publish a dev server's port:
+
+```sh
+oc --podman-arg -p --podman-arg 4321:4321
+```
+
+The `--podman-arg=VALUE` form works too. Use `--` to stop parsing if an
+opencode argument itself starts with `--podman-arg`. A dev server started
+inside the container has to listen on `0.0.0.0` (not only `127.0.0.1`) for the
+published port to be reachable from the host.
+
 ## SSH keys
 
 The private key never enters the container. Instead, `oc()`:

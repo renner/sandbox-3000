@@ -158,6 +158,37 @@ git config --global commit.gpgsign true
 Run this inside the sandbox. `~/.gitconfig` there lives in the `opencode-home`
 volume, so it survives restarts.
 
+## API keys
+
+Store provider API keys (Helmcode, Ionos, ...) as
+[podman secrets](https://docs.podman.io/en/latest/markdown/podman-secret-create.1.html)
+on the host. Every secret named `oc_env_<VAR>` is passed into the container by
+`oc()` as the environment variable `<VAR>`:
+
+```sh
+var=HELMCODE_API_KEY   # or IONOS_API_KEY, ...
+read -rsp "$var: " key && echo
+printf '%s' "$key" | podman secret create "oc_env_$var" -
+unset key var
+```
+
+Without any such secret, `oc` starts as usual. The keys are not written to the
+image, the `opencode-home` volume, your shell startup files or `podman inspect`
+output. To rotate one, remove the secret and create it again:
+
+```sh
+podman secret ls
+podman secret rm oc_env_HELMCODE_API_KEY
+```
+
+Reference the variables from opencode's config (`~/.config/opencode/opencode.json`
+inside the container, which lives in the `opencode-home` volume) as
+`{env:HELMCODE_API_KEY}` rather than pasting the key into the file.
+
+The secrets protect the keys from the host and from image layers, not from the
+agent: anything running in the container can read the variables. Use dedicated
+keys with spend limits.
+
 ## What persists
 
 - `/work` — the directory you launched `oc` from, bind-mounted read-write.

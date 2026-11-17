@@ -49,8 +49,19 @@ oc() {
   podman pull -q "$image" >/dev/null || \
     echo "oc: could not pull $image, using the local copy if present" >&2
 
+  # Pass every podman secret named oc_env_<VAR> into the container as $VAR
+  # (see README); without any, start as usual.
+  local -a extra=()
+  local name
+  while IFS= read -r name; do
+    case $name in
+      oc_env_?*) extra+=(--secret "$name,type=env,target=${name#oc_env_}") ;;
+    esac
+  done < <(podman secret ls --format '{{.Name}}' 2>/dev/null)
+
   podman run --rm -it \
     "${podman_args[@]}" \
+    ${extra[@]+"${extra[@]}"} \
     --userns=keep-id:uid=1000,gid=1000 \
     -v "$PWD":/work:Z \
     -v opencode-home:/home/agent \

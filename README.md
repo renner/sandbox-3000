@@ -5,40 +5,22 @@
 launch it from is mounted at `/work`, and your host SSH agent is forwarded in,
 so commits can be signed without private keys ever entering the container.
 
-## Contents
+## Quick start
 
-| File | Purpose |
-| --- | --- |
-| `Containerfile` | Builds the `opencode-sandbox` image |
-| `opencode-sandbox.sh` | Defines the `oc()` shell function that launches it |
-| `install.sh` | Installs, updates or removes the shell integration |
-| `set-podman-secret.sh` | Creates or rotates an `oc_env_<VAR>` podman secret |
+```sh
+./install.sh
+cd ~/src/some-project
+oc
+```
+
+That's it. `oc` launches opencode in a sandbox with your SSH agent available.
 
 ## Requirements
 
-- `podman`
-- A private SSH key at `~/.ssh/agent_sandbox` on the host (see [SSH keys](#ssh-keys))
-- `XDG_RUNTIME_DIR` set — already the case on systemd systems
-  (`/run/user/$(id -u)`)
-- SELinux hosts are supported: the script relabels the project directory with
-  `:Z` and disables the container label for the forwarded agent socket
-
-## Build
-
-From the repository root:
-
-```sh
-podman build -t opencode-sandbox .
-```
-
-The image is openSUSE Tumbleweed with `git`, `ripgrep`, `curl`, `tar`, `gzip`,
-`openssh-clients` and `opencode` installed. It runs as an unprivileged `agent`
-user (uid 1000) with `/work` as the working directory.
-
-`oc` does not build anything: on every launch it pulls
-`ghcr.io/renner/opencode-sandbox:latest` from GHCR, which the GitHub Actions
-workflow publishes on pushes to `main`. If the pull fails, it uses the local copy
-of that image. To run a locally built image instead, tag it with that name.
+- `podman` (≥ 3.2 for podman secrets)
+- `XDG_RUNTIME_DIR` set — already the case on systemd systems (`/run/user/$(id -u)`)
+- A private SSH key at `~/.ssh/agent_sandbox` on the host is **recommended** (see [SSH keys](#ssh-keys))
+- SELinux hosts are supported: the script relabels the project directory with `:Z`
 
 ## Install the shell integration
 
@@ -50,18 +32,17 @@ running it as a script does nothing. `install.sh` takes care of that:
 ```
 
 It copies `opencode-sandbox.sh` to `~/.config/shell/`, adds a marked block to
-`~/.bashrc` that sources it, reminds you if `~/.ssh/agent_sandbox` is missing,
-and pre-pulls the container image. Open a new shell afterwards.
+`~/.bashrc` that sources it, and reminds you if `~/.ssh/agent_sandbox` is missing.
+Open a new shell afterwards.
 
 The script is safe to re-run. Running it again after a `git pull` updates the
-installed function, and the `~/.bashrc` block is never added twice. The image
-itself needs no update step, because `oc` pulls it on every launch.
+installed function, and the `~/.bashrc` block is never added twice.
 
 | Option | Effect |
 | --- | --- |
 | `--no-pull` | Skip pre-pulling the image |
 | `--rc-file FILE` | Hook into `FILE` instead of `~/.bashrc` |
-| `--uninstall` | Remove the installed function and the `~/.bashrc` block |
+| `--uninstall` | Remove the function file and the `~/.bashrc` block |
 
 `--uninstall` leaves the `opencode-home` volume and your SSH key alone.
 
@@ -88,8 +69,8 @@ For bash, `~/.bashrc` alone is usually enough: login shells read
 and most distributions' default `.profile` sources `~/.bashrc`. Put the line in
 one file only; sourcing it twice works, but just redefines the same function.
 
-The function uses `local`, so source it from bash (or another shell that
-supports `local`) rather than a strict POSIX `sh`.
+The function uses `local`, so source it from bash or zsh rather than a strict
+POSIX `sh`.
 
 ## Usage
 
@@ -98,7 +79,7 @@ cd ~/src/some-project
 oc
 ```
 
-`oc` mounts the **current directory** at `/work` and runs `opencode` there.
+`oc` mounts the **current directory** at `/work` and runs opencode there.
 Because the path is taken from `$PWD` at launch time, always `cd` to the project
 you want to work on before calling `oc`. Extra arguments are passed through to
 opencode:
@@ -122,6 +103,24 @@ opencode argument itself starts with `--podman-arg`. A dev server started
 inside the container has to listen on `0.0.0.0` (not only `127.0.0.1`) for the
 published port to be reachable from the host.
 
+### Override the container image
+
+`oc` pulls `ghcr.io/renner/opencode-sandbox:latest` on every launch. To use a
+different image, set `OC_IMAGE` before launching `oc`:
+
+```sh
+OC_IMAGE=my-registry/opencode-sandbox:dev oc
+```
+
+To skip the pull entirely (for example when testing a local build), use
+`--no-pull`:
+
+```sh
+./install.sh --no-pull   # skip pre-pull during install
+podman build -t ghcr.io/renner/opencode-sandbox:latest .
+oc --no-pull             # use the local image without pulling
+```
+
 ## SSH keys
 
 The private key never enters the container. Instead, `oc()`:
@@ -144,6 +143,15 @@ What it expects:
   `/agent-sandbox.sock`, which `ssh-agent` cannot create
 - the same key is registered on GitHub as an **authentication** key if you push
   over SSH, and as a **signing** key if you sign commits
+
+### Verify the installation
+
+After installing, verify the function is available:
+
+```sh
+type oc
+# should print: oc is a function
+```
 
 ### Commit signing inside the container
 
@@ -198,9 +206,9 @@ Reference the variables from opencode's config (`~/.config/opencode/opencode.jso
 inside the container, which lives in the `opencode-home` volume) as
 `{env:PROVIDER_API_KEY}` rather than pasting the key into the file.
 
-The secrets protect the keys from the host and from image layers, not from the
-agent: anything running in the container can read the variables. Use dedicated
-keys with spend limits.
+The secrets protect the keys from image layers, the `opencode-home` volume, and
+shell history — but not from processes running inside the container. Use
+dedicated keys with spend limits.
 
 ## What persists
 
@@ -216,3 +224,47 @@ The container is started with `--cap-drop=ALL` and
 `--security-opt no-new-privileges`, and runs as the unprivileged `agent` user.
 Private keys stay on the host; only the agent socket is shared. Note that the
 project directory is mounted read-write.
+
+## Repository layout
+
+| File | Purpose |
+| --- | --- |
+| `Containerfile` | Builds the `opencode-sandbox` image |
+| `opencode-sandbox.sh` | Defines the `oc()` shell function that launches it |
+| `install.sh` | Installs, updates or removes the shell integration |
+| `set-podman-secret.sh` | Creates or rotates an `oc_env_<VAR>` podman secret |
+| `LICENSE` | MIT license |
+| `.github/workflows/build.yml` | GitHub Actions workflow to build and push the image |
+
+## Building locally
+
+If you need a local build, run:
+
+```sh
+podman build -t opencode-sandbox .
+```
+
+The image is openSUSE Tumbleweed with `git`, `ripgrep`, `curl`, `tar`, `gzip`,
+`openssh-clients` and `opencode` installed. It runs as an unprivileged `agent`
+user (uid 1000) with `/work` as the working directory.
+
+`oc` defaults to pulling `ghcr.io/renner/opencode-sandbox:latest` from GHCR,
+which the GitHub Actions workflow publishes on pushes to `main`. If the pull
+fails, it falls back to whatever copy is already present locally. To use a
+locally built image, either tag it as `ghcr.io/renner/opencode-sandbox:latest`
+or use `oc --no-pull`.
+
+## Troubleshooting
+
+- **`XDG_RUNTIME_DIR` not set**: the ssh-agent socket won't be created. Set it
+  or run on a systemd system.
+- **Nothing listening on agent socket**: `oc()` restarts `ssh-agent`; if it
+  still fails, verify `~/.ssh/agent_sandbox` exists.
+- **Port unreachable**: a dev server inside the container must bind to
+  `0.0.0.0` (not `127.0.0.1`) for `--podman-arg -p` to work.
+- **Offline / no pull**: `oc` falls back to a local image copy if the pull fails.
+- **SELinux**: the `:Z` option relabels the project directory for the container.
+
+## License
+
+MIT license — see `LICENSE` for details.

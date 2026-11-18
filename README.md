@@ -12,6 +12,7 @@ so commits can be signed without private keys ever entering the container.
 | `Containerfile` | Builds the `opencode-sandbox` image |
 | `opencode-sandbox.sh` | Defines the `oc()` shell function that launches it |
 | `install.sh` | Installs, updates or removes the shell integration |
+| `set-podman-secret.sh` | Creates or rotates an `oc_env_<VAR>` podman secret |
 
 ## Requirements
 
@@ -160,30 +161,42 @@ volume, so it survives restarts.
 
 ## API keys
 
-Store provider API keys (Helmcode, Ionos, ...) as
+Store provider API keys (for example `PROVIDER_API_KEY`) as
 [podman secrets](https://docs.podman.io/en/latest/markdown/podman-secret-create.1.html)
 on the host. Every secret named `oc_env_<VAR>` is passed into the container by
 `oc()` as the environment variable `<VAR>`:
 
 ```sh
-var=HELMCODE_API_KEY   # or IONOS_API_KEY, ...
-read -rsp "$var: " key && echo
-printf '%s' "$key" | podman secret create "oc_env_$var" -
-unset key var
+./set-podman-secret.sh PROVIDER_API_KEY
+```
+
+The script prompts for the value without echoing it, creates or replaces the
+secret `oc_env_PROVIDER_API_KEY`, and prints the matching row from
+`podman secret ls`. It needs a podman with `secret create --replace` (4.x or
+newer). For automation, pipe the value in instead:
+
+```sh
+printf '%s' "$PROVIDER_API_KEY" | ./set-podman-secret.sh PROVIDER_API_KEY
 ```
 
 Without any such secret, `oc` starts as usual. The keys are not written to the
 image, the `opencode-home` volume, your shell startup files or `podman inspect`
-output. To rotate one, remove the secret and create it again:
+output. To rotate one, run the script again with the same name:
+
+```sh
+./set-podman-secret.sh PROVIDER_API_KEY
+```
+
+To see what is configured, or to remove a key entirely:
 
 ```sh
 podman secret ls
-podman secret rm oc_env_HELMCODE_API_KEY
+podman secret rm oc_env_PROVIDER_API_KEY
 ```
 
 Reference the variables from opencode's config (`~/.config/opencode/opencode.json`
 inside the container, which lives in the `opencode-home` volume) as
-`{env:HELMCODE_API_KEY}` rather than pasting the key into the file.
+`{env:PROVIDER_API_KEY}` rather than pasting the key into the file.
 
 The secrets protect the keys from the host and from image layers, not from the
 agent: anything running in the container can read the variables. Use dedicated

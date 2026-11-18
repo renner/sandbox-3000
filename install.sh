@@ -24,6 +24,13 @@ Usage: $0 [--no-pull] [--rc-file FILE] [--uninstall]
   --no-pull        do not pre-pull the container image
   --rc-file FILE   shell startup file to hook into (default: ~/.bashrc)
   --uninstall      remove the function file and the startup file hook
+
+The shell function 'oc()' supports additional options:
+  --no-pull        skip pulling the image for this session (use local build)
+  --podman-arg X   pass argument X to 'podman run' (repeat as needed)
+
+Environment variables:
+  OC_IMAGE         override the default image name (default: ghcr.io/renner/opencode-sandbox:latest)
 EOF
 }
 

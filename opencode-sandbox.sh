@@ -1,12 +1,18 @@
+# Default image to pull; overridden by OC_IMAGE env var, or --no-pull flag.
+: "${OC_IMAGE:=ghcr.io/renner/opencode-sandbox:latest}"
+
 oc() {
   local sock="$XDG_RUNTIME_DIR/agent-sandbox.sock"
   local rc
   local -a podman_args=()
 
-  # Pull out oc's own options; everything else is passed on to opencode.
+  # Parse oc's own options.
+  local do_pull=1
+  local image="$OC_IMAGE"
   # Repeat --podman-arg once per podman argument, e.g.:
   #   oc --podman-arg -p --podman-arg 4321:4321
   # Use -- to stop parsing and pass the remaining arguments to opencode.
+  # --no-pull: skip the podman pull, use $image as-is (for local builds).
   while [ $# -gt 0 ]; do
     case "$1" in
       --podman-arg)
@@ -19,6 +25,10 @@ oc() {
         ;;
       --podman-arg=*)
         podman_args+=("${1#*=}")
+        shift
+        ;;
+      --no-pull)
+        do_pull=0
         shift
         ;;
       --)
@@ -43,11 +53,12 @@ oc() {
   SSH_AUTH_SOCK="$sock" ssh-add -l >/dev/null 2>&1 || \
     SSH_AUTH_SOCK="$sock" ssh-add -c ~/.ssh/agent_sandbox
 
-  # Always start from the latest published image; if the pull fails (e.g.
+  # Pull the image unless --no-pull was specified. If the pull fails (e.g.
   # offline), fall back to whatever copy is already present locally.
-  local image="ghcr.io/renner/opencode-sandbox:latest"
-  podman pull -q "$image" >/dev/null || \
-    echo "oc: could not pull $image, using the local copy if present" >&2
+  if [ "$do_pull" -eq 1 ]; then
+    podman pull -q "$image" >/dev/null || \
+      echo "oc: could not pull $image, using the local copy if present" >&2
+  fi
 
   # Pass every podman secret named oc_env_<VAR> into the container as $VAR
   # (see README); without any, start as usual.

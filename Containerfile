@@ -2,7 +2,13 @@ FROM registry.opensuse.org/opensuse/tumbleweed:latest
 
 RUN zypper --non-interactive refresh && \
     zypper --non-interactive install --no-recommends \
-      git ripgrep curl tar gzip openssh-clients && \
+      git ripgrep curl tar gzip openssh-clients \
+      findutils diffutils patch file which gawk less \
+      jq yq \
+      unzip zip bzip2 zstd \
+      tree fd sqlite3 \
+      lsof iproute2 psmisc socat rsync \
+      gh ast-grep ShellCheck shfmt just git-delta && \
     zypper clean --all
 
 ENV OPENCODE_INSTALL_DIR=/usr/local/bin

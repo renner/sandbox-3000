@@ -245,8 +245,14 @@ podman build -t opencode-sandbox .
 ```
 
 The image is openSUSE Tumbleweed with `git`, `ripgrep`, `curl`, `tar`, `gzip`,
-`openssh-clients` and `opencode` installed. It runs as an unprivileged `agent`
-user (uid 1000) with `/work` as the working directory.
+`openssh-clients`, `opencode` and a set of common agent tools installed: shell
+utilities (`findutils`, `diffutils`, `patch`, `file`, `which`, `gawk`, `less`),
+JSON/YAML processing (`jq`, `yq`), archive support (`unzip`, `zip`, `bzip2`,
+`zstd`), navigation and inspection (`tree`, `fd`, `sqlite3`), process and
+network debugging (`lsof`, `iproute2`, `psmisc`, `socat`), `rsync`, and the
+agent workflow tools `gh`, `ast-grep`, `ShellCheck`, `shfmt`, `just` and
+`git-delta`. It runs as an unprivileged `agent` user (uid 1000) with `/work` as
+the working directory.
 
 `oc` defaults to pulling `ghcr.io/renner/opencode-sandbox:latest` from GHCR,
 which the GitHub Actions workflow publishes on pushes to `main`. If the pull

@@ -2,11 +2,12 @@
 : "${OC_IMAGE:=ghcr.io/renner/opencode-sandbox:latest}"
 
 oc() {
-  local sock="$XDG_RUNTIME_DIR/agent-sandbox.sock"
   local rc
   local -a podman_args=()
-  local instance="default"
+  local instance=""
+  local instance_set=0
   local copy_from=""
+  local copy_from_set=0
 
   # Parse oc's own options.
   local do_pull=1
@@ -15,7 +16,8 @@ oc() {
   #   oc --podman-arg -p --podman-arg 4321:4321
   # Use -- to stop parsing and pass the remaining arguments to opencode.
   # --no-pull: skip the podman pull, use $image as-is (for local builds).
-  # --instance NAME: use named instance for isolation (default: "default")
+  # --instance NAME: use named instance for isolation
+  # --copy-config-from [NAME]: copy home dir from an instance; omit NAME for legacy default
   while [ $# -gt 0 ]; do
     case "$1" in
       --podman-arg)
@@ -40,22 +42,27 @@ oc() {
           return 2
         fi
         instance="$2"
+        instance_set=1
         shift 2
         ;;
       --instance=*)
         instance="${1#*=}"
+        instance_set=1
         shift
         ;;
       --copy-config-from)
-        if [ $# -lt 2 ]; then
-          echo "oc: --copy-config-from needs a value" >&2
-          return 2
+        copy_from_set=1
+        if [ $# -ge 2 ] && [[ "$2" != -* ]]; then
+          copy_from="$2"
+          shift 2
+        else
+          copy_from=""
+          shift
         fi
-        copy_from="$2"
-        shift 2
         ;;
       --copy-config-from=*)
         copy_from="${1#*=}"
+        copy_from_set=1
         shift
         ;;
       --)
@@ -68,8 +75,16 @@ oc() {
     esac
   done
 
-  # Instance-specific socket path
-  sock="$XDG_RUNTIME_DIR/agent-sandbox-${instance}.sock"
+  local sock volume container_name source_volume
+  if [ "$instance_set" -eq 1 ]; then
+    sock="$XDG_RUNTIME_DIR/agent-sandbox-${instance}.sock"
+    volume="opencode-home-${instance}"
+    container_name="opencode-sandbox-${instance}"
+  else
+    sock="$XDG_RUNTIME_DIR/agent-sandbox.sock"
+    volume="opencode-home"
+    container_name="opencode-sandbox"
+  fi
 
   # Start ssh-agent if nothing is listening on the socket
   SSH_AUTH_SOCK="$sock" ssh-add -l >/dev/null 2>&1
@@ -101,18 +116,35 @@ oc() {
   done < <(podman secret ls --format '{{.Name}}' 2>/dev/null)
 
   # Copy config from a template instance if requested and the new instance's volume doesn't exist yet
-  if [ -n "$copy_from" ] && ! podman volume inspect "opencode-home-${instance}" >/dev/null 2>&1; then
-    echo "oc: copying config from instance '$copy_from' to '$instance'" >&2
-    podman run --rm -v "opencode-home-${copy_from}":/src:ro -v "opencode-home-${instance}":/dst "$image" sh -c "cp -r /src/. /dst/ 2>/dev/null || true"
+  if [ "$copy_from_set" -eq 1 ] && ! podman volume inspect "$volume" >/dev/null 2>&1; then
+    if [ -n "$copy_from" ]; then
+      source_volume="opencode-home-${copy_from}"
+    else
+      source_volume="opencode-home"
+    fi
+    if ! podman volume inspect "$source_volume" >/dev/null 2>&1; then
+      if [ -n "$copy_from" ]; then
+        echo "oc: source instance '$copy_from' (volume $source_volume) does not exist" >&2
+      else
+        echo "oc: legacy source volume $source_volume does not exist" >&2
+      fi
+      return 1
+    fi
+    if [ -n "$copy_from" ]; then
+      echo "oc: copying config from instance '$copy_from' to ${instance:-legacy default}" >&2
+    else
+      echo "oc: copying config from legacy default to ${instance:-legacy default}" >&2
+    fi
+    podman run --rm -v "$source_volume":/src:ro -v "$volume":/dst "$image" sh -c "cp -r /src/. /dst/ 2>/dev/null || true"
   fi
 
   podman run --rm -it \
     "${podman_args[@]}" \
     ${extra[@]+"${extra[@]}"} \
-    --name "opencode-sandbox-${instance}" \
+    --name "$container_name" \
     --userns=keep-id:uid=1000,gid=1000 \
     -v "$PWD":/work:Z \
-    -v "opencode-home-${instance}":/home/agent \
+    -v "$volume":/home/agent \
     -v "$sock":/run/ssh-agent.sock \
     -e SSH_AUTH_SOCK=/run/ssh-agent.sock \
     --security-opt label=disable \

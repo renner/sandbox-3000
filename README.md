@@ -83,8 +83,12 @@ oc
 
 ### Running multiple instances
 
-By default, all instances share the same socket and named volume. To run
-isolated instances (e.g., for different projects simultaneously), use
+By default (no `--instance`), `oc` uses the legacy unsuffixed resources:
+- SSH agent socket: `$XDG_RUNTIME_DIR/agent-sandbox.sock`
+- Named volume: `opencode-home`
+- Container name: `opencode-sandbox`
+
+To run isolated instances (e.g., for different projects simultaneously), use
 `--instance NAME`:
 
 ```sh
@@ -92,12 +96,15 @@ oc --instance project1
 oc --instance project2
 ```
 
-Each instance gets:
-- Its own SSH agent socket: `$XDG_RUNTIME_DIR/agent-sandbox-PROJECT.sock`
-- Its own named volume: `opencode-home-PROJECT`
-- Its own container name: `opencode-sandbox-PROJECT`
+Each explicitly named instance gets:
+- Its own SSH agent socket: `$XDG_RUNTIME_DIR/agent-sandbox-NAME.sock`
+- Its own named volume: `opencode-home-NAME`
+- Its own container name: `opencode-sandbox-NAME`
 
-The default instance is named `"default"` if `--instance` is omitted.
+`--instance default` is treated as an explicit instance name and uses the
+suffixed `*-default` resources; it does **not** refer to the legacy unsuffixed
+default.
+
 Because the path is taken from `$PWD` at launch time, always `cd` to the project
 you want to work on before calling `oc`. Extra arguments are passed through to
 opencode:
@@ -109,12 +116,21 @@ oc --help
 ### Copying config from a template instance
 
 When creating a new instance, you can copy the home directory from an existing
-instance using `--copy-config-from NAME`. This is useful for setting up a new
-project with a known-good configuration from another instance:
+instance using `--copy-config-from`. This is useful for setting up a new
+project with a known-good configuration:
 
 ```sh
+# Copy from the legacy unsuffixed default (opencode-home)
+oc --instance newproject --copy-config-from
+
+# Copy from an explicit named instance
 oc --instance newproject --copy-config-from baseconfig
 ```
+
+If a name is provided, it must refer to an existing explicit instance volume
+(e.g. `--copy-config-from default` requires `opencode-home-default`; it does
+not fall back to the legacy `opencode-home`). If the source volume does not
+exist, `oc` exits with an error.
 
 The copy only happens if the new instance's volume doesn't already exist, so
 running the same command again won't overwrite existing configuration.
@@ -126,8 +142,8 @@ source volume is mounted read-only for safety.
 | Option | Effect |
 | --- | --- |
 | `--no-pull` | Skip pre-pulling the image |
-| `--instance NAME` | Use named instance for isolation (default: "default") |
-| `--copy-config-from NAME` | Copy home directory from an existing instance on first launch |
+| `--instance NAME` | Use an explicitly named instance for isolation |
+| `--copy-config-from [NAME]` | Copy home directory on first launch; omit NAME to copy from the legacy unsuffixed default |
 
 ### Passing options to podman
 

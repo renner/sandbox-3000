@@ -80,6 +80,24 @@ oc
 ```
 
 `oc` mounts the **current directory** at `/work` and runs opencode there.
+
+### Running multiple instances
+
+By default, all instances share the same socket and named volume. To run
+isolated instances (e.g., for different projects simultaneously), use
+`--instance NAME`:
+
+```sh
+oc --instance project1
+oc --instance project2
+```
+
+Each instance gets:
+- Its own SSH agent socket: `$XDG_RUNTIME_DIR/agent-sandbox-PROJECT.sock`
+- Its own named volume: `opencode-home-PROJECT`
+- Its own container name: `opencode-sandbox-PROJECT`
+
+The default instance is named `"default"` if `--instance` is omitted.
 Because the path is taken from `$PWD` at launch time, always `cd` to the project
 you want to work on before calling `oc`. Extra arguments are passed through to
 opencode:
@@ -87,6 +105,29 @@ opencode:
 ```sh
 oc --help
 ```
+
+### Copying config from a template instance
+
+When creating a new instance, you can copy the home directory from an existing
+instance using `--copy-config-from NAME`. This is useful for setting up a new
+project with a known-good configuration from another instance:
+
+```sh
+oc --instance newproject --copy-config-from baseconfig
+```
+
+The copy only happens if the new instance's volume doesn't already exist, so
+running the same command again won't overwrite existing configuration.
+
+The copy is performed with a one-time container run that copies all files from
+the source instance's home directory to the new instance's home directory. The
+source volume is mounted read-only for safety.
+
+| Option | Effect |
+| --- | --- |
+| `--no-pull` | Skip pre-pulling the image |
+| `--instance NAME` | Use named instance for isolation (default: "default") |
+| `--copy-config-from NAME` | Copy home directory from an existing instance on first launch |
 
 ### Passing options to podman
 
@@ -230,7 +271,7 @@ project directory is mounted read-write.
 | File | Purpose |
 | --- | --- |
 | `Containerfile` | Builds the `opencode-sandbox` image |
-| `opencode-sandbox.sh` | Defines the `oc()` shell function that launches it |
+| `opencode-sandbox.sh` | Defines the `oc()` shell function that launches it (supports `--instance` for multiple instances) |
 | `install.sh` | Installs, updates or removes the shell integration |
 | `set-podman-secret.sh` | Creates or rotates an `oc_env_<VAR>` podman secret |
 | `LICENSE` | MIT license |

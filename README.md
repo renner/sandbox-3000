@@ -8,7 +8,7 @@ so commits can be signed without private keys ever entering the container.
 ## Quick start
 
 ```sh
-./install.sh
+./scripts/install.sh
 cd ~/src/some-project
 oc
 ```
@@ -24,14 +24,15 @@ That's it. `oc` launches opencode in a sandbox with your SSH agent available.
 
 ## Install the shell integration
 
-`opencode-sandbox.sh` only *defines* a function, so it has to be **sourced**;
-running it as a script does nothing. `install.sh` takes care of that:
+`scripts/opencode-sandbox.sh` only *defines* a function, so it has to be
+**sourced**; running it as a script does nothing. `scripts/install.sh` takes
+care of that:
 
 ```sh
-./install.sh
+./scripts/install.sh
 ```
 
-It copies `opencode-sandbox.sh` to `~/.config/shell/`, adds a marked block to
+It copies `scripts/opencode-sandbox.sh` to `~/.config/shell/`, adds a marked block to
 `~/.bashrc` that sources it, and reminds you if `~/.ssh/agent_sandbox` is missing.
 Open a new shell afterwards.
 
@@ -51,7 +52,7 @@ installed function, and the `~/.bashrc` block is never added twice.
 To do it by hand, copy the file and add this line to your shell's startup file:
 
 ```sh
-install -D -m 0644 opencode-sandbox.sh ~/.config/shell/opencode-sandbox.sh
+install -D -m 0644 scripts/opencode-sandbox.sh ~/.config/shell/opencode-sandbox.sh
 
 [ -f "$HOME/.config/shell/opencode-sandbox.sh" ] && \
   . "$HOME/.config/shell/opencode-sandbox.sh"
@@ -173,7 +174,7 @@ To skip the pull entirely (for example when testing a local build), use
 `--no-pull`:
 
 ```sh
-./install.sh --no-pull   # skip pre-pull during install
+./scripts/install.sh --no-pull   # skip pre-pull during install
 podman build -t ghcr.io/renner/opencode-sandbox:latest .
 oc --no-pull             # use the local image without pulling
 ```
@@ -232,7 +233,7 @@ on the host. Every secret named `oc_env_<VAR>` is passed into the container by
 `oc()` as the environment variable `<VAR>`:
 
 ```sh
-./set-podman-secret.sh PROVIDER_API_KEY
+./scripts/set-podman-secret.sh PROVIDER_API_KEY
 ```
 
 The script prompts for the value without echoing it, creates or replaces the
@@ -241,7 +242,7 @@ secret `oc_env_PROVIDER_API_KEY`, and prints the matching row from
 newer). For automation, pipe the value in instead:
 
 ```sh
-printf '%s' "$PROVIDER_API_KEY" | ./set-podman-secret.sh PROVIDER_API_KEY
+printf '%s' "$PROVIDER_API_KEY" | ./scripts/set-podman-secret.sh PROVIDER_API_KEY
 ```
 
 Without any such secret, `oc` starts as usual. The keys are not written to the
@@ -249,7 +250,7 @@ image, the `opencode-home` volume, your shell startup files or `podman inspect`
 output. To rotate one, run the script again with the same name:
 
 ```sh
-./set-podman-secret.sh PROVIDER_API_KEY
+./scripts/set-podman-secret.sh PROVIDER_API_KEY
 ```
 
 To see what is configured, or to remove a key entirely:
@@ -287,9 +288,9 @@ project directory is mounted read-write.
 | File | Purpose |
 | --- | --- |
 | `Containerfile` | Builds the `opencode-sandbox` image |
-| `opencode-sandbox.sh` | Defines the `oc()` shell function that launches it (supports `--instance` for multiple instances) |
-| `install.sh` | Installs, updates or removes the shell integration |
-| `set-podman-secret.sh` | Creates or rotates an `oc_env_<VAR>` podman secret |
+| `scripts/opencode-sandbox.sh` | Defines the `oc()` shell function that launches it (supports `--instance` for multiple instances) |
+| `scripts/install.sh` | Installs, updates or removes the shell integration |
+| `scripts/set-podman-secret.sh` | Creates or rotates an `oc_env_<VAR>` podman secret |
 | `LICENSE` | MIT license |
 | `.github/workflows/build.yml` | GitHub Actions workflow to build and push the image |
 

@@ -116,35 +116,41 @@ oc --help
 
 ### Copying config from a template instance
 
-When creating a new instance, you can copy the home directory from an existing
-instance using `--copy-config-from`. This is useful for setting up a new
-project with a known-good configuration:
+When creating a new instance, or to update an existing one, you can copy
+configuration files from another instance using `--copy-config-from`. This is
+useful for setting up a new project with a known-good configuration or syncing
+config updates across instances:
 
 ```sh
-# Copy from the legacy unsuffixed default (opencode-home)
+# Copy from the legacy unsuffixed default (opencode-home) to a new instance
 oc --instance newproject --copy-config-from
 
-# Copy from an explicit named instance
+# Copy from an explicit named instance to a new instance
 oc --instance newproject --copy-config-from baseconfig
+
+# Update an existing instance's config (requires --force)
+oc --instance newproject --copy-config-from baseconfig --force
 ```
 
-If a name is provided, it must refer to an existing explicit instance volume
-(e.g. `--copy-config-from default` requires `opencode-home-default`; it does
-not fall back to the legacy `opencode-home`). If the source volume does not
-exist, `oc` exits with an error.
+The following config files are copied:
+- `~/.config/opencode/opencode.json` - opencode configuration
+- `~/.gitconfig` - git configuration (user name, email, signing settings)
+- `~/.bash_history` - shell history
 
-The copy only happens if the new instance's volume doesn't already exist, so
-running the same command again won't overwrite existing configuration.
+If a name is provided to `--copy-config-from`, it must refer to an existing
+explicit instance volume (e.g. `--copy-config-from default` requires
+`opencode-home-default`; it does not fall back to the legacy `opencode-home`).
+If the source volume does not exist, `oc` exits with an error.
 
-The copy is performed with a one-time container run that copies all files from
-the source instance's home directory to the new instance's home directory. The
-source volume is mounted read-only for safety.
+Copying to an existing volume requires `--force` to confirm overwriting files.
+The copy operation shows which files were copied.
 
 | Option | Effect |
 | --- | --- |
 | `--no-pull` | Skip pre-pulling the image |
 | `--instance NAME` | Use an explicitly named instance for isolation |
-| `--copy-config-from [NAME]` | Copy home directory on first launch; omit NAME to copy from the legacy unsuffixed default |
+| `--copy-config-from [NAME]` | Copy config files from an instance; omit NAME to copy from the legacy unsuffixed default |
+| `--force` | Allow copying config to an existing volume (overwrites files) |
 
 ### Passing options to podman
 

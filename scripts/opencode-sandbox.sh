@@ -8,6 +8,7 @@ oc() {
   local instance_set=0
   local copy_from=""
   local copy_from_set=0
+  local force=0
 
   # Parse oc's own options.
   local do_pull=1
@@ -17,7 +18,8 @@ oc() {
   # Use -- to stop parsing and pass the remaining arguments to opencode.
   # --no-pull: skip the podman pull, use $image as-is (for local builds).
   # --instance NAME: use named instance for isolation
-  # --copy-config-from [NAME]: copy home dir from an instance; omit NAME for legacy default
+  # --copy-config-from [NAME]: copy config files from an instance; omit NAME for legacy default
+  # --force: allow copying config to an existing volume (overwrites files)
   while [ $# -gt 0 ]; do
     case "$1" in
       --podman-arg)
@@ -63,6 +65,10 @@ oc() {
       --copy-config-from=*)
         copy_from="${1#*=}"
         copy_from_set=1
+        shift
+        ;;
+      --force)
+        force=1
         shift
         ;;
       --)
@@ -115,13 +121,16 @@ oc() {
     esac
   done < <(podman secret ls --format '{{.Name}}' 2>/dev/null)
 
-  # Copy config from a template instance if requested and the new instance's volume doesn't exist yet
-  if [ "$copy_from_set" -eq 1 ] && ! podman volume inspect "$volume" >/dev/null 2>&1; then
+  # Copy config from a template instance if requested
+  if [ "$copy_from_set" -eq 1 ]; then
+    # Determine source volume
     if [ -n "$copy_from" ]; then
       source_volume="opencode-home-${copy_from}"
     else
       source_volume="opencode-home"
     fi
+
+    # Check source exists
     if ! podman volume inspect "$source_volume" >/dev/null 2>&1; then
       if [ -n "$copy_from" ]; then
         echo "oc: source instance '$copy_from' (volume $source_volume) does not exist" >&2
@@ -130,12 +139,44 @@ oc() {
       fi
       return 1
     fi
-    if [ -n "$copy_from" ]; then
-      echo "oc: copying config from instance '$copy_from' to ${instance:-legacy default}" >&2
-    else
-      echo "oc: copying config from legacy default to ${instance:-legacy default}" >&2
+
+    # Check if destination exists and requires --force
+    local dest_exists=0
+    if podman volume inspect "$volume" >/dev/null 2>&1; then
+      dest_exists=1
+      if [ "$force" -eq 0 ]; then
+        echo "oc: volume $volume already exists; use --force to overwrite config files" >&2
+        return 1
+      fi
     fi
-    podman run --rm -v "$source_volume":/src:ro -v "$volume":/dst "$image" sh -c "cp -r /src/. /dst/ 2>/dev/null || true"
+
+    # Determine what to copy
+    local desc
+    if [ -n "$copy_from" ]; then
+      desc="instance '$copy_from'"
+    else
+      desc="legacy default"
+    fi
+    local target_desc
+    if [ "$instance_set" -eq 1 ]; then
+      target_desc="instance '${instance}'"
+    else
+      target_desc="legacy default"
+    fi
+
+    echo "oc: copying config files from $desc to $target_desc" >&2
+
+    # Copy only specific config files
+    podman run --rm --userns=keep-id:uid=1000,gid=1000 -v "$source_volume":/src:ro -v "$volume":/dst "$image" sh -c '
+      for f in .config/opencode/opencode.json .gitconfig .bash_history; do
+        if [ -f "/src/$f" ]; then
+          df=$(dirname "/dst/$f")
+          mkdir -p "$df"
+          cp "/src/$f" "/dst/$f"
+          echo "  copied: $f" >&2
+        fi
+      done
+    '
   fi
 
   podman run --rm -it \
@@ -151,4 +192,3 @@ oc() {
     --cap-drop=ALL --security-opt no-new-privileges \
     "$image" opencode "$@"
 }
-

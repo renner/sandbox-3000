@@ -167,10 +167,11 @@ oc() {
     echo "oc: copying config files from $desc to $target_desc" >&2
 
     # Copy only specific config files
-    podman run --rm -v "$source_volume":/src:ro -v "$volume":/dst "$image" sh -c '
-      mkdir -p /dst/.config/opencode
+    podman run --rm --userns=keep-id:uid=1000,gid=1000 -v "$source_volume":/src:ro -v "$volume":/dst "$image" sh -c '
       for f in .config/opencode/opencode.json .gitconfig .bash_history; do
         if [ -f "/src/$f" ]; then
+          df=$(dirname "/dst/$f")
+          mkdir -p "$df"
           cp "/src/$f" "/dst/$f"
           echo "  copied: $f" >&2
         fi
